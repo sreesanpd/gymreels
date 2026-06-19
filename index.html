@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GymReels</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=7">
+    
+    <!-- PWA / iOS Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ccff00">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GymReels">
+</head>
+<body>
+    <div id="app-container">
+        <!-- HEADER -->
+        <header id="main-header">
+            <h1>GymReels</h1>
+        </header>
+
+        <!-- MAIN VIEWS -->
+        <main id="view-container">
+            
+            <!-- Workout Player View -->
+            <section id="workout-view" class="view hidden">
+                <button id="btn-toggle-aspect" class="secondary-btn" style="position: absolute; top: 20px; right: 20px; z-index: 10; padding: 6px 12px; font-size: 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(4px);">⛶ Landscape</button>
+                <div id="active-workout-timer" class="hidden" style="position: absolute; top: 20px; left: 20px; z-index: 10; padding: 4px 12px; font-size: 20px; font-weight: 800; background: rgba(0,0,0,0.5); border: 1px solid rgba(204,255,0,0.3); border-radius: 8px; color: var(--accent-neon); backdrop-filter: blur(4px); font-variant-numeric: tabular-nums;">
+                    0:00
+                </div>
+                <div id="workout-scroll-container">
+                    <!-- YouTube Slides will be injected here -->
+                    <div class="empty-state" id="workout-empty-state">
+                        <p>No workout plan active.</p>
+                        <p>Go to Manage to create one.</p>
+                    </div>
+                </div>
+
+                <!-- Global Overlays -->
+                <div id="start-workout-overlay" class="overlay">
+                    <button id="btn-start-workout" class="primary-btn">Start Workout</button>
+                    <p class="helper-text">Tap to enable video playback</p>
+                </div>
+
+                <div id="rest-timer-overlay" class="overlay hidden">
+                    <div class="timer-circle">
+                        <svg viewBox="0 0 100 100">
+                            <circle class="timer-bg" cx="50" cy="50" r="45"></circle>
+                            <circle class="timer-progress" cx="50" cy="50" r="45"></circle>
+                        </svg>
+                        <div class="timer-text">
+                            <span id="rest-time-remaining">30</span><span class="sec">s</span>
+                        </div>
+                    </div>
+                    <h2>Rest</h2>
+                    <p id="next-set-info">Next: Set 2 of 4</p>
+                    <button id="btn-skip-rest" class="secondary-btn">Skip Rest</button>
+                </div>
+
+                <div id="workout-complete-overlay" class="overlay hidden">
+                    <div style="font-size: 64px; margin-bottom: 20px;">
+                        🎉 💪 🔥
+                    </div>
+                    <h2 style="font-size: 28px; margin-bottom: 10px;">Workout Complete!</h2>
+                    <p class="helper-text" style="margin-bottom: 30px; font-size: 16px;">Amazing job crushing those sets.</p>
+                    <button id="btn-finish-workout" class="primary-btn">Back to Plan</button>
+                </div>
+            </section>
+
+
+            <!-- MANAGE VIEW -->
+            <section id="manage-view" class="view active">
+                <h2 class="view-title">Manage Workout</h2>
+                
+                <div class="card form-card">
+                    <h3>Add Exercise</h3>
+                    
+                    <div class="input-group">
+                        <label for="yt-link">YouTube Link</label>
+                        <input type="text" id="yt-link" placeholder="https://youtube.com/watch?v=...">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="exercise-name">Exercise Name</label>
+                        <input type="text" id="exercise-name" placeholder="e.g. Deadlift">
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label for="loop-duration">Duration (sec)</label>
+                            <input type="number" id="loop-duration" value="10" min="1">
+                        </div>
+                        <div class="input-group">
+                            <label for="target-sets">Sets</label>
+                            <input type="number" id="target-sets" value="4" min="1">
+                        </div>
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label for="rest-interval">Rest Interval (sec)</label>
+                            <input type="number" id="rest-interval" value="30" min="0">
+                        </div>
+                    </div>
+
+                    <button id="btn-add-exercise" class="primary-btn">Add to Plan</button>
+                </div>
+
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0;">Current Plan</h3>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="btn-import-plan" class="secondary-btn" style="padding: 5px 15px; font-size: 14px; min-width: 0;">Import</button>
+                            <button id="btn-export-plan" class="secondary-btn" style="padding: 5px 15px; font-size: 14px; min-width: 0;">Export</button>
+                            <button id="btn-share-whatsapp" class="secondary-btn" style="padding: 5px 15px; font-size: 14px; min-width: 0; color: #25D366; border-color: rgba(37, 211, 102, 0.3);">Share via WhatsApp</button>
+                            <input type="file" id="import-file" accept=".json" style="display: none;">
+                        </div>
+                    </div>
+                    <ul class="exercise-list" id="exercise-list">
+                        <!-- List populated by JS -->
+                    </ul>
+                </div>
+
+                <div class="card" style="margin-top: 15px; margin-bottom: 30px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 14px; font-weight: 600;">PWA Sync (iOS / Standalone)</span>
+                        <button id="btn-copy-sync-code" class="secondary-btn" style="padding: 4px 12px; font-size: 12px; min-width: 0;">Copy Sync Code</button>
+                    </div>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">iOS Home Screen apps cannot open external links. Copy & paste the raw code here instead.</p>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="sync-code-input" placeholder="Paste sync code here..." style="flex: 1; background: var(--bg-dark); border: 1px solid var(--border-color); border-radius: 8px; color: #fff; padding: 8px 12px; font-size: 12px; font-family: monospace; outline: none;">
+                        <button id="btn-import-sync-code" class="secondary-btn" style="padding: 8px 16px; font-size: 12px; font-weight: 600; min-width: 0; color: var(--text-main); border-color: var(--border-color);">Import</button>
+                    </div>
+                </div>
+            </section>
+            
+        </main>
+
+        <!-- BOTTOM NAVIGATION -->
+        <nav id="bottom-nav">
+            <div class="nav-pill">
+                <button class="nav-tab" data-target="workout-view">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 4v16M18 4v16M4 8h4v8H4zM16 8h4v8h-4zM8 12h8"/>
+                    </svg>
+                    <span>Workout</span>
+                </button>
+                <button class="nav-tab active" data-target="manage-view">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <span>Manage</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <!-- YouTube IFrame API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="app.js"></script>
+</body>
+</html>
