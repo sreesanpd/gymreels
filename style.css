@@ -194,14 +194,21 @@ input:focus {
 }
 
 .exercise-item {
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
+    background-color: var(--surface-color);
     padding: 15px;
+    border-radius: 12px;
     margin-bottom: 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.exercise-item.dragging {
+    opacity: 0.5;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 2px dashed var(--accent-neon);
 }
 
 .ex-details h4 {

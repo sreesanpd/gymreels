@@ -1,4 +1,7 @@
-let plan = [];
+let plan = []; // Current active plan's array
+let allPlans = {}; // Dictionary of all plans {"Leg Day": [...], "Arm Day": [...]}
+let currentPlanName = "Default Plan";
+
 let currentWorkoutIndex = 0;
 let currentSet = 1;
 let restTimerInterval = null;
@@ -14,6 +17,14 @@ if ('serviceWorker' in navigator) {
 
 // Screen Wake Lock API
 let wakeLock = null;
+let noSleep = null;
+
+try {
+    noSleep = new NoSleep();
+} catch (e) {
+    console.error("NoSleep.js could not be initialized");
+}
+
 async function requestWakeLock() {
     try {
         if ('wakeLock' in navigator) {
@@ -22,11 +33,19 @@ async function requestWakeLock() {
     } catch (err) {
         console.error(`Wake Lock error: ${err.message}`);
     }
+    
+    // Fallback for iOS
+    if (noSleep) {
+        noSleep.enable();
+    }
 }
 
 function releaseWakeLock() {
     if (wakeLock !== null) {
         wakeLock.release().then(() => { wakeLock = null; });
+    }
+    if (noSleep) {
+        noSleep.disable();
     }
 }
 
@@ -44,9 +63,10 @@ const manageView = document.getElementById('manage-view');
 
 const ytLinkInput = document.getElementById('yt-link');
 const exerciseNameInput = document.getElementById('exercise-name');
-const durationInput = document.getElementById('loop-duration');
+const loopDurationInput = document.getElementById('loop-duration');
 const targetSetsInput = document.getElementById('target-sets');
-const restIntervalInput = document.getElementById('rest-interval');
+const restSetsInput = document.getElementById('rest-sets');
+const restExerciseInput = document.getElementById('rest-exercise');
 const btnAddExercise = document.getElementById('btn-add-exercise');
 const exerciseList = document.getElementById('exercise-list');
 
@@ -131,12 +151,23 @@ function setupEventListeners() {
     });
 
     // Import/Export functionality
+    const btnExportLibrary = document.getElementById('btn-export-library');
+    if (btnExportLibrary) {
+        btnExportLibrary.addEventListener('click', () => {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allPlans));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", "gymreels_full_library.json");
+            dlAnchorElem.click();
+        });
+    }
+
     if (btnExportPlan) {
         btnExportPlan.addEventListener('click', () => {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(plan));
             const dlAnchorElem = document.createElement('a');
             dlAnchorElem.setAttribute("href", dataStr);
-            dlAnchorElem.setAttribute("download", "repmax_workout.json");
+            dlAnchorElem.setAttribute("download", `gymreels_${currentPlanName.replace(/[^a-zA-Z0-9]/g, '_')}.json`);
             dlAnchorElem.click();
         });
     }
@@ -153,15 +184,31 @@ function setupEventListeners() {
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
-                    const importedPlan = JSON.parse(e.target.result);
-                    if (Array.isArray(importedPlan)) {
-                        plan = importedPlan;
+                    const importedData = JSON.parse(e.target.result);
+                    if (Array.isArray(importedData)) {
+                        const newName = "Imported Plan " + Math.floor(Math.random() * 1000);
+                        allPlans[newName] = importedData;
+                        currentPlanName = newName;
+                        plan = allPlans[currentPlanName];
                         savePlan();
                         renderManageList();
                         buildWorkoutSlides();
-                        alert("Workout plan imported successfully!");
+                        updatePlanSelector();
+                        alert(`Workout plan imported as "${newName}"!`);
+                    } else if (typeof importedData === 'object' && importedData !== null) {
+                        if (confirm("This will overwrite your entire workout library. Are you sure?")) {
+                            allPlans = importedData;
+                            currentPlanName = Object.keys(allPlans)[0] || "Default Plan";
+                            plan = allPlans[currentPlanName] || [];
+                            if (!allPlans[currentPlanName]) allPlans[currentPlanName] = plan;
+                            savePlan();
+                            renderManageList();
+                            buildWorkoutSlides();
+                            updatePlanSelector();
+                            alert("Full workout library restored successfully!");
+                        }
                     } else {
-                        alert("Invalid plan format. Must be a valid JSON array.");
+                        alert("Invalid plan format.");
                     }
                 } catch (error) {
                     alert("Error parsing file. Please select a valid JSON file.");
@@ -188,8 +235,8 @@ function setupEventListeners() {
 
     if (btnCopySyncCode) {
         btnCopySyncCode.addEventListener('click', () => {
-            if (plan.length === 0) { alert("Plan is empty!"); return; }
-            const safeB64 = btoa(unescape(encodeURIComponent(JSON.stringify(plan))));
+            if (Object.keys(allPlans).length === 0) { alert("Library is empty!"); return; }
+            const safeB64 = btoa(unescape(encodeURIComponent(JSON.stringify(allPlans))));
             
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(safeB64).then(() => {
@@ -220,14 +267,31 @@ function setupEventListeners() {
             const code = syncCodeInput.value.trim();
             if (!code) return;
             try {
-                const importedPlan = JSON.parse(decodeURIComponent(escape(atob(code))));
-                if (Array.isArray(importedPlan)) {
-                    plan = importedPlan;
+                const importedData = JSON.parse(decodeURIComponent(escape(atob(code))));
+                if (Array.isArray(importedData)) {
+                    const newName = "Imported Plan " + Math.floor(Math.random() * 1000);
+                    allPlans[newName] = importedData;
+                    currentPlanName = newName;
+                    plan = allPlans[currentPlanName];
                     savePlan();
                     renderManageList();
                     buildWorkoutSlides();
+                    updatePlanSelector();
                     syncCodeInput.value = "";
-                    alert("PWA Sync successful! Plan loaded.");
+                    alert(`PWA Sync successful! Plan loaded as "${newName}".`);
+                } else if (typeof importedData === 'object' && importedData !== null) {
+                    if (confirm("This will overwrite your entire workout library. Are you sure?")) {
+                        allPlans = importedData;
+                        currentPlanName = Object.keys(allPlans)[0] || "Default Plan";
+                        plan = allPlans[currentPlanName] || [];
+                        if (!allPlans[currentPlanName]) allPlans[currentPlanName] = plan;
+                        savePlan();
+                        renderManageList();
+                        buildWorkoutSlides();
+                        updatePlanSelector();
+                        syncCodeInput.value = "";
+                        alert("Full workout library restored successfully!");
+                    }
                 } else {
                     alert("Invalid code format.");
                 }
@@ -257,21 +321,26 @@ function extractYouTubeInfo(url) {
     let startTime = 0;
     
     // Extract ID
-    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
-    if (match && match[7].length == 11) {
-        videoId = match[7];
+    if (match && match[2].length === 11) {
+        videoId = match[2];
     }
     
     // Extract t= parameter
-    const urlParams = new URL(url.replace('#', '?')).searchParams; // Handle #t= too
-    if (urlParams.has('t')) {
-        let tStr = urlParams.get('t');
-        if (tStr.includes('s')) {
-            startTime = parseInt(tStr.replace('s', ''));
-        } else {
-            startTime = parseInt(tStr);
+    try {
+        const safeUrl = url.startsWith('http') ? url : `https://${url}`;
+        const urlParams = new URL(safeUrl.replace('#', '?')).searchParams; // Handle #t= too
+        if (urlParams.has('t')) {
+            let tStr = urlParams.get('t');
+            if (tStr.includes('s')) {
+                startTime = parseInt(tStr.replace('s', ''));
+            } else {
+                startTime = parseInt(tStr);
+            }
         }
+    } catch(e) {
+        // If URL parsing fails, default to 0
     }
     
     return { videoId, startTime: isNaN(startTime) ? 0 : startTime };
@@ -280,9 +349,10 @@ function extractYouTubeInfo(url) {
 function addExercise() {
     const url = ytLinkInput.value.trim();
     const name = exerciseNameInput.value.trim() || "Exercise";
-    const duration = parseInt(durationInput.value) || 10;
+    const duration = parseInt(loopDurationInput.value) || 10;
     const sets = parseInt(targetSetsInput.value) || 4;
-    const rest = parseInt(restIntervalInput.value) || 30;
+    const restSets = parseInt(restSetsInput.value) || 0;
+    const restExercise = parseInt(restExerciseInput.value) || 0;
 
     if (!url) {
         alert("Please enter a YouTube Link.");
@@ -305,7 +375,8 @@ function addExercise() {
                 name,
                 duration,
                 sets,
-                rest
+                restSets,
+                restExercise
             };
         }
         editingId = null;
@@ -318,7 +389,8 @@ function addExercise() {
             name,
             duration,
             sets,
-            rest
+            restSets,
+            restExercise
         };
         plan.push(ex);
     }
@@ -341,14 +413,19 @@ function editExercise(id) {
     // Populate form
     ytLinkInput.value = `https://youtu.be/${ex.videoId}?t=${ex.startTime}`;
     exerciseNameInput.value = ex.name;
-    durationInput.value = ex.duration;
+    loopDurationInput.value = ex.duration;
     targetSetsInput.value = ex.sets;
-    restIntervalInput.value = ex.rest;
+    restSetsInput.value = ex.restSets !== undefined ? ex.restSets : (ex.rest || 0);
+    restExerciseInput.value = ex.restExercise !== undefined ? ex.restExercise : (ex.rest || 0);
     
     btnAddExercise.innerText = "Save Changes";
     
-    // Smooth scroll to top
-    manageView.scrollTo({ top: 0, behavior: 'smooth' });
+    // Smooth scroll to the form
+    const formCard = document.querySelector('.card.form-card');
+    if (formCard) {
+        formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => ytLinkInput.focus(), 300);
+    }
 }
 
 function removeExercise(id) {
@@ -363,10 +440,16 @@ function renderManageList() {
     plan.forEach((ex, index) => {
         const li = document.createElement('li');
         li.className = 'exercise-item';
+        li.dataset.id = ex.id;
         li.innerHTML = `
-            <div class="ex-details">
-                <h4>${index + 1}. ${ex.name}</h4>
-                <p>${ex.duration}s loop • ${ex.sets} sets • ${ex.rest}s rest</p>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="drag-handle" style="cursor: grab; color: var(--text-secondary); display: flex; align-items: center;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                </div>
+                <div class="exercise-info">
+                    <strong>${ex.name}</strong>
+                    <p>${ex.duration}s loop • ${ex.sets} sets • Rest: ${ex.restSets !== undefined ? ex.restSets : (ex.rest || 0)}s / ${ex.restExercise !== undefined ? ex.restExercise : (ex.rest || 0)}s</p>
+                </div>
             </div>
             <div class="list-actions">
                 <button class="action-btn edit-btn" onclick="editExercise('${ex.id}')">
@@ -379,39 +462,88 @@ function renderManageList() {
         `;
         exerciseList.appendChild(li);
     });
+    updatePlanSelector();
+    
+    // Re-bind sortable since we destroyed the DOM children
+    if (typeof initSortable === 'function') {
+        initSortable();
+    }
 }
 
 function savePlan() {
-    localStorage.setItem('repmax_plan', JSON.stringify(plan));
+    allPlans[currentPlanName] = plan;
+    localStorage.setItem('gymreels_plans', JSON.stringify(allPlans));
+    localStorage.setItem('gymreels_active_plan', currentPlanName);
 }
 
 // --- STORAGE LOGIC ---
 function loadPlan() {
-    // Check if there is a shared plan payload in the URL
+    // 1. Try to load new format
+    const savedPlans = localStorage.getItem('gymreels_plans');
+    const activePlan = localStorage.getItem('gymreels_active_plan');
+    
+    if (savedPlans) {
+        try {
+            allPlans = JSON.parse(savedPlans);
+            currentPlanName = activePlan || Object.keys(allPlans)[0];
+            plan = allPlans[currentPlanName];
+            if (!plan) {
+                plan = [];
+                allPlans[currentPlanName] = plan;
+            }
+        } catch (e) {
+            allPlans = { "Default Plan": [] };
+            currentPlanName = "Default Plan";
+            plan = allPlans[currentPlanName];
+        }
+    } else {
+        // 2. Migration from old format
+        const oldSaved = localStorage.getItem('repmax_plan');
+        if (oldSaved) {
+            try {
+                const oldPlan = JSON.parse(oldSaved);
+                allPlans = { "Default Plan": oldPlan };
+            } catch (e) {
+                allPlans = { "Default Plan": [] };
+            }
+        } else {
+            allPlans = { "Default Plan": [] };
+        }
+        currentPlanName = "Default Plan";
+        plan = allPlans[currentPlanName];
+        savePlan(); // save to new format
+    }
+
+    // Check for shared data in URL
     const urlParams = new URLSearchParams(window.location.search);
     const sharedData = urlParams.get('plan');
     if (sharedData) {
         try {
-            // Decode the safe base64
-            const importedPlan = JSON.parse(decodeURIComponent(escape(atob(sharedData))));
-            if (Array.isArray(importedPlan)) {
-                localStorage.setItem('repmax_plan', JSON.stringify(importedPlan));
-                // Clean the URL so it doesn't stay there if we refresh
+            const importedData = JSON.parse(decodeURIComponent(escape(atob(sharedData))));
+            if (Array.isArray(importedData)) {
+                // Individual plan imported (from WhatsApp usually)
+                const newName = "Imported Plan " + Math.floor(Math.random() * 1000);
+                allPlans[newName] = importedData;
+                currentPlanName = newName;
+                plan = allPlans[currentPlanName];
+                savePlan();
+                
                 window.history.replaceState({}, document.title, window.location.pathname);
-                alert("Shared workout plan loaded successfully!");
+                alert(`Shared workout plan loaded as "${newName}"!`);
+            } else if (typeof importedData === 'object' && importedData !== null) {
+                // Full library imported (from Sync Code usually)
+                allPlans = importedData;
+                currentPlanName = Object.keys(allPlans)[0] || "Default Plan";
+                plan = allPlans[currentPlanName] || [];
+                if (!allPlans[currentPlanName]) allPlans[currentPlanName] = plan;
+                savePlan();
+                
+                window.history.replaceState({}, document.title, window.location.pathname);
+                alert("Full workout library synced successfully!");
             }
         } catch(e) {
             console.error("Invalid shared plan payload.");
             alert("The shared workout link is invalid or corrupted.");
-        }
-    }
-
-    const saved = localStorage.getItem('repmax_plan');
-    if (saved) {
-        try {
-            plan = JSON.parse(saved);
-        } catch (e) {
-            plan = [];
         }
     }
 }
@@ -515,6 +647,8 @@ function handleScrollEnd() {
     isScrolling = false;
     if (!workoutActive) return;
     
+    ignorePollingUntil = Date.now() + 1500; // Debounce poller to allow new video time to load
+    
     const slideHeight = workoutScrollContainer.clientHeight;
     const newIndex = Math.round(workoutScrollContainer.scrollTop / slideHeight);
     
@@ -544,12 +678,15 @@ function handleScrollEnd() {
     }
 }
 
+let ignorePollingUntil = 0;
+
 // Polling for loop logic
 function startPolling() {
     if (poller) clearInterval(poller);
     
     poller = setInterval(() => {
         if (!workoutActive || restTimerOverlay.classList.contains('hidden') === false || isScrolling) return;
+        if (Date.now() < ignorePollingUntil) return;
 
         const player = players[currentWorkoutIndex];
         if (!player || typeof player.getCurrentTime !== 'function') return;
@@ -580,17 +717,15 @@ function handleLoopEnd() {
     const player = players[currentWorkoutIndex];
     
     if (currentSet < ex.sets) {
-        // Sets remaining
         player.pauseVideo();
-        startRestTimer(ex.rest, false);
+        startRestTimer(ex.restSets !== undefined ? ex.restSets : (ex.rest || 0), false);
     } else {
         // Sets completed for this exercise
         player.pauseVideo();
         
-        if (currentWorkoutIndex < plan.length - 1) {
-            // More exercises left in the plan
+        if (currentWorkoutIndex + 1 < plan.length) {
             // Trigger the rest timer before we scroll to the next exercise
-            startRestTimer(ex.rest, true);
+            startRestTimer(ex.restExercise !== undefined ? ex.restExercise : (ex.rest || 0), true);
         } else {
             // Workout Complete
             workoutActive = false;
@@ -660,6 +795,7 @@ function skipRest() {
 }
 
 function finishRest(isTransitioning) {
+    ignorePollingUntil = Date.now() + 1500; // Debounce poller to allow YouTube API time to reset
     clearInterval(restTimerInterval);
     restTimerOverlay.classList.add('hidden');
     
@@ -696,3 +832,120 @@ function updateStatsUI() {
 
 // Init
 document.addEventListener('DOMContentLoaded', init);
+
+// --- MULTIPLE PLANS LOGIC ---
+const planSelector = document.getElementById('plan-selector');
+const btnNewPlan = document.getElementById('btn-new-plan');
+const btnRenamePlan = document.getElementById('btn-rename-plan');
+const btnDeletePlan = document.getElementById('btn-delete-plan');
+
+function updatePlanSelector() {
+    if (!planSelector) return;
+    planSelector.innerHTML = '';
+    Object.keys(allPlans).forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.innerText = `${name} (${allPlans[name].length} exercises)`;
+        if (name === currentPlanName) {
+            option.selected = true;
+        }
+        planSelector.appendChild(option);
+    });
+}
+
+if (planSelector) {
+    planSelector.addEventListener('change', (e) => {
+        currentPlanName = e.target.value;
+        plan = allPlans[currentPlanName];
+        savePlan();
+        renderManageList();
+        buildWorkoutSlides();
+    });
+}
+
+if (btnNewPlan) {
+    btnNewPlan.addEventListener('click', () => {
+        const newName = prompt("Enter a name for the new workout plan:");
+        if (newName && newName.trim() !== "") {
+            if (allPlans[newName]) {
+                alert("A plan with this name already exists.");
+                return;
+            }
+            allPlans[newName] = [];
+            currentPlanName = newName;
+            plan = allPlans[currentPlanName];
+            savePlan();
+            renderManageList();
+            buildWorkoutSlides();
+        }
+    });
+}
+
+if (btnRenamePlan) {
+    btnRenamePlan.addEventListener('click', () => {
+        const newName = prompt("Enter a new name for this plan:", currentPlanName);
+        if (newName && newName.trim() !== "" && newName !== currentPlanName) {
+            if (allPlans[newName]) {
+                alert("A plan with this name already exists.");
+                return;
+            }
+            allPlans[newName] = allPlans[currentPlanName];
+            delete allPlans[currentPlanName];
+            currentPlanName = newName;
+            plan = allPlans[currentPlanName];
+            savePlan();
+            renderManageList(); // update dropdown
+        }
+    });
+}
+
+if (btnDeletePlan) {
+    btnDeletePlan.addEventListener('click', () => {
+        if (Object.keys(allPlans).length <= 1) {
+            alert("You cannot delete your only workout plan.");
+            return;
+        }
+        if (confirm(`Are you sure you want to delete "${currentPlanName}"?`)) {
+            delete allPlans[currentPlanName];
+            currentPlanName = Object.keys(allPlans)[0];
+            plan = allPlans[currentPlanName];
+            savePlan();
+            renderManageList();
+            buildWorkoutSlides();
+        }
+    });
+}
+
+// --- DRAG AND DROP REORDERING (SortableJS) ---
+let sortableInstance = null;
+
+function initSortable() {
+    if (sortableInstance) {
+        sortableInstance.destroy();
+    }
+    
+    sortableInstance = new Sortable(exerciseList, {
+        handle: '.drag-handle', // only drag using the handle icon
+        animation: 150,
+        ghostClass: 'dragging',
+        onEnd: function (evt) {
+            const items = [...exerciseList.querySelectorAll('.exercise-item')];
+            const newPlan = [];
+            
+            items.forEach(item => {
+                const id = item.dataset.id;
+                const ex = plan.find(p => p.id === id);
+                if (ex) newPlan.push(ex);
+            });
+            
+            plan = newPlan;
+            savePlan();
+            buildWorkoutSlides();
+        }
+    });
+}
+
+// Call initSortable right after the DOM content loads
+document.addEventListener('DOMContentLoaded', () => {
+    initSortable();
+});

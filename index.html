@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GymReels</title>
+    <title>GymReels - Focus. Lift. Repeat.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script src="nosleep.js"></script>
+    <script src="sortable.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css?v=7">
     
@@ -77,6 +79,38 @@
             <section id="manage-view" class="view active">
                 <h2 class="view-title">Manage Workout</h2>
                 
+                <div class="card">
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h3 style="margin: 0;">Select Workout</h3>
+                            <div style="display: flex; gap: 10px;">
+                                <button id="btn-export-library" class="secondary-btn" style="padding: 5px 15px; font-size: 14px; min-width: 0; color: var(--accent-neon); border-color: rgba(204, 255, 0, 0.3);">Backup All</button>
+                                <button id="btn-new-plan" class="secondary-btn" style="padding: 5px 15px; font-size: 14px; min-width: 0;">+ New</button>
+                                <button id="btn-rename-plan" class="secondary-btn" style="padding: 5px 15px; font-size: 14px; min-width: 0;">Rename</button>
+                                <button id="btn-delete-plan" class="secondary-btn" style="padding: 5px 15px; font-size: 14px; min-width: 0; color: #ff4444; border-color: rgba(255, 68, 68, 0.3);">Delete</button>
+                            </div>
+                        </div>
+                        <select id="plan-selector" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; font-size: 16px;">
+                            <!-- Options populated via JS -->
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0;">Exercises in Plan</h3>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="btn-import-plan" class="secondary-btn" style="padding: 5px 15px; font-size: 14px; min-width: 0;">Import</button>
+                            <button id="btn-export-plan" class="secondary-btn" style="padding: 5px 15px; font-size: 14px; min-width: 0;">Export Plan</button>
+                            <button id="btn-share-whatsapp" class="secondary-btn" style="padding: 5px 15px; font-size: 14px; min-width: 0; color: #25D366; border-color: rgba(37, 211, 102, 0.3);">Share via WhatsApp</button>
+                            <input type="file" id="import-file" accept=".json" style="display: none;">
+                        </div>
+                    </div>
+                    <ul class="exercise-list" id="exercise-list">
+                        <!-- List populated by JS -->
+                    </ul>
+                </div>
+
                 <div class="card form-card">
                     <h3>Add Exercise</h3>
                     
@@ -103,27 +137,16 @@
 
                     <div class="input-row">
                         <div class="input-group">
-                            <label for="rest-interval">Rest Interval (sec)</label>
-                            <input type="number" id="rest-interval" value="30" min="0">
+                            <label for="rest-sets">Rest Between Sets (sec)</label>
+                            <input type="number" id="rest-sets" value="30" min="0">
+                        </div>
+                        <div class="input-group">
+                            <label for="rest-exercise">Rest After Exercise (sec)</label>
+                            <input type="number" id="rest-exercise" value="60" min="0">
                         </div>
                     </div>
 
                     <button id="btn-add-exercise" class="primary-btn">Add to Plan</button>
-                </div>
-
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3 style="margin: 0;">Current Plan</h3>
-                        <div style="display: flex; gap: 10px;">
-                            <button id="btn-import-plan" class="secondary-btn" style="padding: 5px 15px; font-size: 14px; min-width: 0;">Import</button>
-                            <button id="btn-export-plan" class="secondary-btn" style="padding: 5px 15px; font-size: 14px; min-width: 0;">Export</button>
-                            <button id="btn-share-whatsapp" class="secondary-btn" style="padding: 5px 15px; font-size: 14px; min-width: 0; color: #25D366; border-color: rgba(37, 211, 102, 0.3);">Share via WhatsApp</button>
-                            <input type="file" id="import-file" accept=".json" style="display: none;">
-                        </div>
-                    </div>
-                    <ul class="exercise-list" id="exercise-list">
-                        <!-- List populated by JS -->
-                    </ul>
                 </div>
 
                 <div class="card" style="margin-top: 15px; margin-bottom: 30px;">
@@ -131,7 +154,7 @@
                         <span style="font-size: 14px; font-weight: 600;">PWA Sync (iOS / Standalone)</span>
                         <button id="btn-copy-sync-code" class="secondary-btn" style="padding: 4px 12px; font-size: 12px; min-width: 0;">Copy Sync Code</button>
                     </div>
-                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">iOS Home Screen apps cannot open external links. Copy & paste the raw code here instead.</p>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">iOS Home Screen apps cannot open external links. Copy & paste the raw code here instead to sync your <strong>entire workout library</strong>.</p>
                     <div style="display: flex; gap: 8px;">
                         <input type="text" id="sync-code-input" placeholder="Paste sync code here..." style="flex: 1; background: var(--bg-dark); border: 1px solid var(--border-color); border-radius: 8px; color: #fff; padding: 8px 12px; font-size: 12px; font-family: monospace; outline: none;">
                         <button id="btn-import-sync-code" class="secondary-btn" style="padding: 8px 16px; font-size: 12px; font-weight: 600; min-width: 0; color: var(--text-main); border-color: var(--border-color);">Import</button>
