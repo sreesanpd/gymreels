@@ -327,6 +327,10 @@ input:focus {
     z-index: 2;
 }
 
+.slide-overlay .btn-toggle-sound {
+    pointer-events: auto; /* Override parent's none so button is clickable */
+}
+
 .slide-title {
     font-size: 24px;
     font-weight: 800;

@@ -21,3 +21,11 @@ For future developers or AI agents contributing to this repository, here is a br
 ## 5. PWA Sync Code Payloads
 * **The Architecture:** Because iOS Home Screen PWAs cannot open external URLs (like WhatsApp links), we allow syncing via base64 encoded strings pasted directly into the UI.
 * **The Gotcha:** A plain `btoa()` call will fail on complex JSON arrays containing emojis or special characters. We must use `btoa(unescape(encodeURIComponent(JSON.stringify(data))))` to safely serialize the payload.
+
+## 6. Service Worker Caching Traps
+* **The Issue:** The app uses a network-first Service Worker with offline caching (`sw.js`). When debugging locally, the browser will persistently serve old versions of `app.js` and `index.html` from the cache even if you do a standard refresh. This can cause confusing "phantom bugs" where users test newly deployed code but execute old code.
+* **The Fix:** If you modify `app.js` or `index.html`, you **MUST** bump the `CACHE_NAME` version string at the top of `sw.js` (e.g., from `v3` to `v4`). This signals the browser to invalidate the cache and pull the latest payload.
+
+## 7. Floating UI Overlap & CSS Z-Index Stacking
+* **The Issue:** Floating transparent buttons (like the `Sound Off` toggle) placed over the workout player were frequently becoming "unclickable" despite having high `z-index` values. This occurred because dynamically injected gradients (like `.slide-overlay`) were rendered *later* in the DOM tree but shared the same `z-index` stacking context, causing them to physically sit on top of the buttons like an invisible shield.
+* **The Fix:** Explicitly set the UI buttons (`btn-toggle-sound`, `btn-toggle-aspect`) to an extraordinarily high `z-index` (e.g., `100`), ensuring they definitively break out of the native stacking flow and sit above all dynamically injected slides.

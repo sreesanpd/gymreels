@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gymreels-cache-v2';
+const CACHE_NAME = 'gymreels-cache-v7';
 const urlsToCache = [
   './',
   './index.html',

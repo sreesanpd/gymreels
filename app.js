@@ -90,6 +90,7 @@ const btnCopySyncCode = document.getElementById('btn-copy-sync-code');
 const syncCodeInput = document.getElementById('sync-code-input');
 const btnImportSyncCode = document.getElementById('btn-import-sync-code');
 const btnToggleAspect = document.getElementById('btn-toggle-aspect');
+let isSoundEnabled = false;
 const activeWorkoutTimer = document.getElementById('active-workout-timer');
 
 // YouTube Players Dictionary
@@ -301,6 +302,36 @@ function setupEventListeners() {
         });
     }
 
+    // Edit/Delete Exercise Delegation
+    exerciseList.addEventListener('click', (e) => {
+        const editBtn = e.target.closest('.edit-btn');
+        const deleteBtn = e.target.closest('.delete-btn');
+        if (editBtn) {
+            editExercise(editBtn.closest('.exercise-item').dataset.id);
+        } else if (deleteBtn) {
+            removeExercise(deleteBtn.closest('.exercise-item').dataset.id);
+        }
+    });
+
+    // Workout View Dynamic Clicks (Sound Toggle)
+    workoutScrollContainer.addEventListener('click', (e) => {
+        const soundBtn = e.target.closest('.btn-toggle-sound');
+        if (soundBtn) {
+            isSoundEnabled = !isSoundEnabled;
+            // Update all sound buttons on the screen
+            document.querySelectorAll('.btn-toggle-sound').forEach(btn => {
+                btn.innerHTML = isSoundEnabled ? '🔊 Sound On' : '🔇 Sound Off';
+            });
+            if (workoutActive && players[currentWorkoutIndex] && typeof players[currentWorkoutIndex].unMute === 'function') {
+                if (isSoundEnabled) {
+                    players[currentWorkoutIndex].unMute();
+                } else {
+                    players[currentWorkoutIndex].mute();
+                }
+            }
+        }
+    });
+
     if (btnToggleAspect) {
         btnToggleAspect.addEventListener('click', () => {
             isLandscapeMode = !isLandscapeMode;
@@ -452,10 +483,10 @@ function renderManageList() {
                 </div>
             </div>
             <div class="list-actions">
-                <button class="action-btn edit-btn" onclick="editExercise('${ex.id}')">
+                <button class="action-btn edit-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                 </button>
-                <button class="action-btn delete-btn" onclick="removeExercise('${ex.id}')">
+                <button class="action-btn delete-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>
                 </button>
             </div>
@@ -576,7 +607,12 @@ function buildWorkoutSlides() {
             </div>
             <div class="slide-overlay">
                 <h2 class="slide-title">${ex.name}</h2>
-                <div class="slide-stats" id="stats-${ex.id}">Set 1 of ${ex.sets}</div>
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div class="slide-stats" id="stats-${ex.id}">Set 1 of ${ex.sets}</div>
+                    <button class="secondary-btn btn-toggle-sound" style="width: auto; padding: 4px 10px; font-size: 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(4px);">
+                        ${isSoundEnabled ? '🔊 Sound On' : '🔇 Sound Off'}
+                    </button>
+                </div>
             </div>
         `;
         workoutScrollContainer.appendChild(slide);
@@ -626,6 +662,7 @@ function startWorkout() {
 
     // If the first player is already fully initialized (from a previous workout), play it immediately!
     if (players[0] && typeof players[0].playVideo === 'function') {
+        if (isSoundEnabled) { players[0].unMute(); } else { players[0].mute(); }
         players[0].seekTo(plan[0].startTime);
         players[0].playVideo();
     }
@@ -635,9 +672,15 @@ function startWorkout() {
 }
 
 function onPlayerReady(event) {
-    event.target.mute(); // Mute by default as per requirements
-    // If this is the first player, play it
     const index = Object.keys(players).find(k => players[k] === event.target);
+    
+    if (isSoundEnabled) {
+        event.target.unMute();
+    } else {
+        event.target.mute(); // Mute by default as per requirements
+    }
+    
+    // If this is the first player, play it
     if (index == currentWorkoutIndex && workoutActive) {
         event.target.playVideo();
     }
@@ -669,9 +712,11 @@ function handleScrollEnd() {
         currentWorkoutIndex = newIndex;
         currentSet = 1; // Reset set count when scrolling to a new exercise
         updateStatsUI();
+        const ex = plan[currentWorkoutIndex];
         
         // Play new video
         if (players[currentWorkoutIndex] && players[currentWorkoutIndex].playVideo) {
+            if (isSoundEnabled) { players[currentWorkoutIndex].unMute(); } else { players[currentWorkoutIndex].mute(); }
             players[currentWorkoutIndex].seekTo(plan[currentWorkoutIndex].startTime);
             players[currentWorkoutIndex].playVideo();
         }
@@ -816,6 +861,7 @@ function finishRest(isTransitioning) {
         const ex = plan[currentWorkoutIndex];
         
         if (player && player.seekTo) {
+            if (isSoundEnabled) { player.unMute(); } else { player.mute(); }
             player.seekTo(ex.startTime);
             player.playVideo();
         }
