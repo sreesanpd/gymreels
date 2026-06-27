@@ -11,7 +11,8 @@ Say goodbye to complex fitness apps—GymReels perfectly crops and aligns your f
 - **Drag & Drop Reordering:** Smooth, touch-friendly UI for reordering your exercises in a flash (powered by SortableJS).
 - **Custom Workout Builder:** Paste any YouTube link (including Shorts), define your target duration, set counts, and distinct rest times (between sets vs. after an exercise).
 - **Smart Rest Timers:** The app automatically pauses the video and overlays a full-screen rest countdown between your sets.
-- **Library Syncing & Sharing:** Generate a secure "Sync Code" to backup your entire workout library and transfer it to a mobile PWA, or easily share individual workout plans with friends via WhatsApp.
+- **Serverless Cloud Auto-Sync:** Link a GitHub Private Repository and GymReels will silently back up your entire workout library in the background. Restore your library on any new device with one tap. No backend servers required!
+- **Library Syncing & Sharing:** Generate a secure "Sync Code" for offline backups, or easily share individual workout plans with friends via WhatsApp.
 - **Progressive Web App (PWA):** Install GymReels directly to your iOS or Android home screen for a completely native, full-screen app experience.
 - **Screen Wake Lock:** Your screen will never dim or fall asleep during your workout, even during long 60-second rest timers, utilizing a robust `NoSleep.js` fallback!
 - **Toggle View Mode:** Swap instantly between immersive Portrait (cropped) and native Landscape (letterboxed) modes to prevent instructors' heads from being cut off.
@@ -35,6 +36,18 @@ Because there is no backend, you can host GymReels for free using GitHub Pages:
 3. Tap **Add to Home Screen**.
 4. Launch GymReels from your home screen to enjoy the immersive, URL-bar-free experience!
 5. **To sync your workouts:** On your Desktop, click "Copy Sync Code", copy the resulting text, and paste it into the "PWA Sync" input on your phone to instantly restore your entire library!
+
+### ☁️ Setting Up Cloud Auto-Sync (GitHub)
+GymReels can automatically back up your workouts to a private GitHub repository, keeping your library perfectly synced across all devices without needing a backend server!
+
+1. Go to your GitHub account and create an **empty, private repository** (e.g., `gymreels-backup`).
+2. Go to GitHub **Settings** > **Developer Settings** > **Personal access tokens** > **Fine-grained tokens**.
+3. Click **Generate new token**.
+4. Under **Repository access**, select **Only select repositories** and pick your new backup repository.
+5. Under **Permissions**, go to **Repository permissions**, find **Contents**, and grant **Read and write** access.
+6. Generate the token and copy it.
+7. Open GymReels, go to the **Manage** tab, and enter your GitHub Username, the Repository Name, and the Token into the Auto-Sync section.
+8. Tap **Save Setup**. Your workouts will now automatically sync in the background whenever you make a change!
 
 ### 💡 Pro Tip: Removing Ads
 Because GymReels uses the official YouTube IFrame API, **YouTube ads may play** before your workout videos if you are not signed in. To completely remove ads for a seamless workout experience, you can either:
