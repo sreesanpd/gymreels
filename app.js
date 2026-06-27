@@ -168,10 +168,44 @@ function setupEventListeners() {
             githubConfig.username = githubUsernameInput.value.trim();
             githubConfig.repo = githubRepoInput.value.trim();
             githubConfig.token = githubTokenInput.value.trim();
-            // We do not reset lastSha here so it can continue updating the existing file if the repo is the same.
+            
+            if (!githubConfig.username || !githubConfig.repo || !githubConfig.token) {
+                alert("Please fill in all fields.");
+                return;
+            }
+
             localStorage.setItem('gymreels_github_config', JSON.stringify(githubConfig));
-            updateGithubStatus("Settings saved");
-            alert("GitHub settings saved! Auto-sync is active.");
+            updateGithubStatus("Checking repository...");
+            
+            const path = "gymreels_full_library.json";
+            const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${path}`;
+            
+            fetch(url, { headers: { 'Authorization': `token ${githubConfig.token}` } })
+                .then(async (res) => {
+                    if (res.ok) {
+                        const data = await res.json();
+                        githubConfig.lastSha = data.sha;
+                        localStorage.setItem('gymreels_github_config', JSON.stringify(githubConfig));
+                        
+                        updateGithubStatus("Backup found");
+                        if (confirm("Found an existing backup in your GitHub repository. Do you want to RESTORE the backup from GitHub onto this device?\n\n- Click OK to load the remote backup (overwrites this device's current workouts).\n- Click Cancel to overwrite the remote backup with this device's current workouts.")) {
+                            restoreFromGitHub();
+                        } else {
+                            pushToGitHub(true);
+                        }
+                    } else if (res.status === 404) {
+                        updateGithubStatus("Creating backup...");
+                        pushToGitHub(true);
+                    } else {
+                        updateGithubStatus(`Error: ${res.status}`);
+                        alert(`Could not verify repository. Status: ${res.status}. Please check your token permissions, username, and repository name.`);
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    updateGithubStatus("Connection error");
+                    alert("Settings saved locally, but a network error occurred while verifying the backup file status.");
+                });
         });
     }
 
@@ -570,6 +604,17 @@ async function pushToGitHub(manual = false) {
             try {
                 const getRes = await fetch(url, { headers: { 'Authorization': `token ${githubConfig.token}` } });
                 if (getRes.ok) {
+                    if (!manual) {
+                        updateGithubStatus("Blocked: Restore first!");
+                        console.warn("Auto-sync blocked: Remote file exists but local device has no sync history.");
+                        return;
+                    }
+                    
+                    if (!confirm("Warning: A cloud backup already exists. Overwriting it will erase your cloud library. Are you sure you want to overwrite it with this device's data?")) {
+                        updateGithubStatus("Sync Cancelled");
+                        return;
+                    }
+
                     const data = await getRes.json();
                     body.sha = data.sha;
                 }
