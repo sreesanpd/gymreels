@@ -160,6 +160,36 @@
                         <button id="btn-import-sync-code" class="secondary-btn" style="padding: 8px 16px; font-size: 12px; font-weight: 600; min-width: 0; color: var(--text-main); border-color: var(--border-color);">Import</button>
                     </div>
                 </div>
+                <div class="card" style="margin-top: 15px; margin-bottom: 30px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 14px; font-weight: 600;">Cloud Auto-Sync (GitHub)</span>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <span id="sync-status-indicator" style="font-size: 12px; color: var(--text-muted);">Not synced</span>
+                            <button id="btn-github-sync-now" class="secondary-btn" style="padding: 4px 12px; font-size: 12px; min-width: 0;">Sync Now</button>
+                            <button id="btn-github-restore" class="secondary-btn" style="padding: 4px 12px; font-size: 12px; min-width: 0;">Restore</button>
+                        </div>
+                    </div>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Automatically back up your workout library to a private GitHub repository.</p>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <div class="input-row">
+                            <div class="input-group">
+                                <label for="github-username" style="font-size: 12px;">GitHub Username</label>
+                                <input type="text" id="github-username" placeholder="e.g. octocat" style="background: var(--bg-dark); border: 1px solid var(--border-color); border-radius: 8px; color: #fff; padding: 8px 12px; font-size: 12px; outline: none;">
+                            </div>
+                            <div class="input-group">
+                                <label for="github-repo" style="font-size: 12px;">Repository Name</label>
+                                <input type="text" id="github-repo" placeholder="e.g. my-backup-repo" style="background: var(--bg-dark); border: 1px solid var(--border-color); border-radius: 8px; color: #fff; padding: 8px 12px; font-size: 12px; outline: none;">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="github-token" style="font-size: 12px;">Fine-Grained PAT (Contents Read/Write)</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="password" id="github-token" placeholder="github_pat_..." style="flex: 1; background: var(--bg-dark); border: 1px solid var(--border-color); border-radius: 8px; color: #fff; padding: 8px 12px; font-size: 12px; font-family: monospace; outline: none;">
+                                <button id="btn-save-github-settings" class="primary-btn" style="padding: 8px 16px; font-size: 12px; font-weight: 600; min-width: 0;">Save Setup</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
             
         </main>

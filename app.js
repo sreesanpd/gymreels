@@ -10,6 +10,9 @@ let isScrolling = false;
 let editingId = null;
 let isLandscapeMode = false;
 
+let githubConfig = { username: '', repo: '', token: '', lastSha: null };
+let githubSyncTimeout = null;
+
 // PWA & Service Worker Registration
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(console.error);
@@ -93,6 +96,14 @@ const btnToggleAspect = document.getElementById('btn-toggle-aspect');
 let isSoundEnabled = false;
 const activeWorkoutTimer = document.getElementById('active-workout-timer');
 
+const githubUsernameInput = document.getElementById('github-username');
+const githubRepoInput = document.getElementById('github-repo');
+const githubTokenInput = document.getElementById('github-token');
+const btnSaveGithubSettings = document.getElementById('btn-save-github-settings');
+const btnGithubSyncNow = document.getElementById('btn-github-sync-now');
+const btnGithubRestore = document.getElementById('btn-github-restore');
+const syncStatusIndicator = document.getElementById('sync-status-indicator');
+
 // YouTube Players Dictionary
 const players = {}; 
 let poller = null;
@@ -150,6 +161,27 @@ function setupEventListeners() {
         clearTimeout(scrollTimeout);
         scrollTimeout = setTimeout(handleScrollEnd, 150);
     });
+
+    // GitHub Auto-Sync Listeners
+    if (btnSaveGithubSettings) {
+        btnSaveGithubSettings.addEventListener('click', () => {
+            githubConfig.username = githubUsernameInput.value.trim();
+            githubConfig.repo = githubRepoInput.value.trim();
+            githubConfig.token = githubTokenInput.value.trim();
+            // We do not reset lastSha here so it can continue updating the existing file if the repo is the same.
+            localStorage.setItem('gymreels_github_config', JSON.stringify(githubConfig));
+            updateGithubStatus("Settings saved");
+            alert("GitHub settings saved! Auto-sync is active.");
+        });
+    }
+
+    if (btnGithubSyncNow) {
+        btnGithubSyncNow.addEventListener('click', () => pushToGitHub(true));
+    }
+
+    if (btnGithubRestore) {
+        btnGithubRestore.addEventListener('click', restoreFromGitHub);
+    }
 
     // Import/Export functionality
     const btnExportLibrary = document.getElementById('btn-export-library');
@@ -501,14 +533,180 @@ function renderManageList() {
     }
 }
 
-function savePlan() {
+function savePlan(skipSync = false) {
     allPlans[currentPlanName] = plan;
     localStorage.setItem('gymreels_plans', JSON.stringify(allPlans));
     localStorage.setItem('gymreels_active_plan', currentPlanName);
+    
+    // Auto-sync if configured
+    if (!skipSync && githubConfig.username && githubConfig.repo && githubConfig.token) {
+        clearTimeout(githubSyncTimeout);
+        githubSyncTimeout = setTimeout(() => {
+            pushToGitHub();
+        }, 3000);
+    }
+}
+
+async function pushToGitHub(manual = false) {
+    if (!githubConfig.username || !githubConfig.repo || !githubConfig.token) return;
+    
+    updateGithubStatus("Syncing...");
+    try {
+        const path = "gymreels_full_library.json";
+        const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${path}`;
+        
+        const contentStr = JSON.stringify(allPlans);
+        const encodedContent = btoa(unescape(encodeURIComponent(contentStr)));
+        
+        const body = {
+            message: "Auto-backup from GymReels PWA",
+            content: encodedContent,
+            branch: "master" // fallback to main if master fails, but will try default branch
+        };
+        
+        if (githubConfig.lastSha) {
+            body.sha = githubConfig.lastSha;
+        } else {
+            try {
+                const getRes = await fetch(url, { headers: { 'Authorization': `token ${githubConfig.token}` } });
+                if (getRes.ok) {
+                    const data = await getRes.json();
+                    body.sha = data.sha;
+                }
+            } catch(e) {}
+        }
+        
+        const response = await fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `token ${githubConfig.token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body)
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            githubConfig.lastSha = data.content.sha;
+            localStorage.setItem('gymreels_github_config', JSON.stringify(githubConfig));
+            const time = new Date().toLocaleTimeString();
+            updateGithubStatus(`Synced at ${time}`);
+            if (manual) alert("Successfully synced to GitHub!");
+        } else {
+            const errorData = await response.json();
+            
+            // If branch error, try main
+            if (errorData.message && errorData.message.includes("branch")) {
+                body.branch = "main";
+                const response2 = await fetch(url, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${githubConfig.token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(body)
+                });
+                if (response2.ok) {
+                    const data = await response2.json();
+                    githubConfig.lastSha = data.content.sha;
+                    localStorage.setItem('gymreels_github_config', JSON.stringify(githubConfig));
+                    const time = new Date().toLocaleTimeString();
+                    updateGithubStatus(`Synced at ${time}`);
+                    if (manual) alert("Successfully synced to GitHub!");
+                    return;
+                }
+            }
+
+            console.error(errorData);
+            updateGithubStatus(`Error: ${response.status}`);
+            if (manual) alert("Failed to sync: " + (errorData.message || response.statusText));
+        }
+    } catch (e) {
+        console.error(e);
+        updateGithubStatus("Network Error");
+        if (manual) alert("Network error during sync.");
+    }
+}
+
+async function restoreFromGitHub() {
+    if (!githubConfig.username || !githubConfig.repo || !githubConfig.token) {
+        alert("Please save your GitHub settings first.");
+        return;
+    }
+    
+    if (!confirm("This will overwrite your entire local workout library with the backup from GitHub. Are you sure?")) return;
+    
+    updateGithubStatus("Restoring...");
+    try {
+        const path = "gymreels_full_library.json";
+        const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${path}`;
+        
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `token ${githubConfig.token}`,
+                'Accept': 'application/vnd.github.v3.raw'
+            }
+        });
+        
+        if (response.ok) {
+            const textContent = await response.text();
+            const importedData = JSON.parse(textContent);
+            
+            allPlans = importedData;
+            currentPlanName = Object.keys(allPlans)[0] || "Default Plan";
+            plan = allPlans[currentPlanName] || [];
+            if (!allPlans[currentPlanName]) allPlans[currentPlanName] = plan;
+            
+            try {
+                const headRes = await fetch(url, { headers: { 'Authorization': `token ${githubConfig.token}` } });
+                if (headRes.ok) {
+                    const headData = await headRes.json();
+                    githubConfig.lastSha = headData.sha;
+                    localStorage.setItem('gymreels_github_config', JSON.stringify(githubConfig));
+                }
+            } catch(e){}
+            
+            savePlan(true); // skip sync when restoring
+            renderManageList();
+            buildWorkoutSlides();
+            updatePlanSelector();
+            
+            updateGithubStatus("Restored successfully");
+            alert("Workout library restored from GitHub!");
+        } else {
+            const errorData = await response.json();
+            updateGithubStatus("Restore Failed");
+            alert("Failed to restore: " + (errorData.message || "File might not exist yet."));
+        }
+    } catch (e) {
+        console.error(e);
+        updateGithubStatus("Network Error");
+        alert("Network error during restore.");
+    }
+}
+
+function updateGithubStatus(msg) {
+    if (syncStatusIndicator) {
+        syncStatusIndicator.textContent = msg;
+        syncStatusIndicator.style.color = msg.includes("Error") || msg.includes("Failed") ? "#ff4444" : "var(--text-muted)";
+    }
 }
 
 // --- STORAGE LOGIC ---
 function loadPlan() {
+    const savedGithubConfig = localStorage.getItem('gymreels_github_config');
+    if (savedGithubConfig) {
+        try {
+            githubConfig = JSON.parse(savedGithubConfig);
+            if (githubUsernameInput) githubUsernameInput.value = githubConfig.username;
+            if (githubRepoInput) githubRepoInput.value = githubConfig.repo;
+            if (githubTokenInput) githubTokenInput.value = githubConfig.token;
+            if (githubConfig.lastSha) {
+                updateGithubStatus("Ready to sync");
+            }
+        } catch(e) {}
+    }
+
     // 1. Try to load new format
     const savedPlans = localStorage.getItem('gymreels_plans');
     const activePlan = localStorage.getItem('gymreels_active_plan');
@@ -542,7 +740,8 @@ function loadPlan() {
         }
         currentPlanName = "Default Plan";
         plan = allPlans[currentPlanName];
-        savePlan(); // save to new format
+        savePlan(true); // save to new format without triggering cloud sync
+
     }
 
     // Check for shared data in URL
